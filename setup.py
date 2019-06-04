@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import sys
 
 install_requires = [
-#    'requests'
+    'requests'
 ]
 
 
@@ -25,6 +25,7 @@ setup(
     ],
     keywords='mercadolibre',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
+    install_requires=install_requires,
     extras_require={},
     package_data={},
     data_files=[],
