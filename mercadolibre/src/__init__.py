@@ -25,5 +25,6 @@ from . import mercadolibre_site
 from . import order
 from . import product
 from . import shipping
+from . import mercadopago
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
