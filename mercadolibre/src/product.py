@@ -16,6 +16,7 @@ class Product(object):
         self.pictures = []
         self.product_id = None
         self.permalink = None
+        self.description = None
         self.variations = []
 
     def publish(self, meli):
@@ -29,7 +30,8 @@ class Product(object):
             'buying_mode': self.buying_mode,
             'condition': self.condition,
             'video_id': self.video_id,
-            'pictures': self.pictures
+            'pictures': self.pictures,
+            'description': self.description,
         }
         # Ejemplo de variantes
         # body['variations'] = [
@@ -62,15 +64,18 @@ class Product(object):
         self.product_id = res.get('id')
         self.permalink = res.get('permalink')
 
+    def update_status(self, meli, state):
+        body = {
+            'status': state
+        }
+        response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+        error_handler.RestErrorHandler.handle_error(response)
+
     def update(self, meli):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
         body = {
             'available_quantity': self.available_quantity
         }
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info('POSTIANDO CON BODY %s y id %s, cantidad %s', body, self.product_id, self.available_quantity)
         response = meli.put_with_token('/items/{}'.format(self.product_id), body)
         error_handler.RestErrorHandler.handle_error(response)
-        _logger.info('res %s', response)

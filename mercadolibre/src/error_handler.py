@@ -13,5 +13,5 @@ class RestErrorHandler:
             if message == 'invalid_token':
                 raise InvalidTokenException('El token que está tratando de utilizar es inválido')
             raise Exception("Error: {}\n{}".format(
-                message, '\n'.join([cause.get('message') for cause in response.get('cause', [])])
+                message, '\n'.join([cause.get('message') for cause in response.get('cause', []) or []])
             ))

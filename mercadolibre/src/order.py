@@ -44,6 +44,7 @@ class Order(object):
         self.status = status
         self.items = items
         self.shipping = shipping
+        self.pack_id = None
 
     @staticmethod
     def get_sale_info_from_resource(meli, resource):
@@ -53,4 +54,6 @@ class Order(object):
         buyer = Buyer.create_buyer_from_dic(res.get('buyer'))
         items = OrderItem.create_items_from_dic(res.get('order_items'))
         shipping = ml_shipping.Shipping.create_shipping_from_dic(res.get('shipping'))
-        return Order(res.get('id'), res.get('currency_id'), res.get('status'), buyer, items, shipping)
+        order = Order(res.get('id'), res.get('currency_id'), res.get('status'), buyer, items, shipping)
+        order.pack_id = res.get('pack_id')
+        return order

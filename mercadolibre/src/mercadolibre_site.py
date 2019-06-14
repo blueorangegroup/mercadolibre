@@ -14,5 +14,4 @@ class MercadolibreSite(mercadolibre.Mercadolibre):
 
     def get_with_token(self, path, extra_headers=None):
         path = '/sites/{}{}'.format(self.site, path)
-        print(path)
         return self.get(path, params={'access_token': self.access_token}, extra_headers=extra_headers)
