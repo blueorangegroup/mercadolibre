@@ -33,35 +33,43 @@ class Product(object):
             'pictures': self.pictures,
             'description': self.description,
         }
-        # Ejemplo de variantes
-        # body['variations'] = [
-        #     {'attribute_combinations': [
-        #         {
-        #             'name': 'Color',
-        #             'value_id': '52049',
-        #             'value_name': 'Negro'
-        #         }
-        #     ],
-        #     'price': 11,
-        #     'available_quantity': 10,
-        #     'picture_ids': ["https://www.artesanosdelaflor.com/1602-large_default/osito-peluche-te-amo-musical.jpg"]
-        #     },
-        #     {'attribute_combinations': [
-        #         {
-        #             'name': 'Color',
-        #             'value_id': '52005',
-        #             'value_name': 'Marrón'
-        #         }
-        #     ],
-        #         'price': 11,
-        #         'available_quantity': 3,
-        #         'picture_ids': ["https://pbs.twimg.com/profile_images/993967511099068416/F3HK-M-4_400x400.jpg"]
-        #     },
-        # ]
+        if self.variations:
+            body['variations'] = [
+                {
+                    'attribute_combinations': [
+                        {
+                            "id": attribute.attribute_id,
+                            "value_id": attribute.value,
+                        }
+                        for attribute in variant.attribute_combinations
+                    ],
+                    'available_quantity': variant.available_quantity,
+                    'price': variant.price,
+                    'attributes': [
+                        {
+                            "id": "SELLER_SKU",
+                            "value_name": variant.sku,
+                        }
+                    ],
+                    'picture_ids': variant.pictures
+                }
+                for variant in self.variations
+            ]
+
         response = meli.post_with_token('/items', body)
         error_handler.RestErrorHandler.handle_error(response)
         res = response.json()
         self.product_id = res.get('id')
+
+        # Tenemos que mapear el id de la variante matcheando por SKU
+        if self.variations:
+            for variation in self.variations:
+                for meli_variation in res.get('variations'):
+                    for meli_attribute in meli_variation.get('attributes'):
+                        if meli_attribute.get('id') == 'SELLER_SKU' \
+                                and meli_attribute.get('value_name') == variation.sku:
+                            variation.product_id = meli_variation.get('id')
+
         self.permalink = res.get('permalink')
 
     def update_status(self, meli, state):
@@ -74,8 +82,53 @@ class Product(object):
     def update(self, meli):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
-        body = {
-            'available_quantity': self.available_quantity
-        }
-        response = meli.put_with_token('/items/{}'.format(self.product_id), body)
-        error_handler.RestErrorHandler.handle_error(response)
+
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info('PORACTU')
+        _logger.info('VARIATIONS %s', self.variations)
+
+        if self.variations:
+            _logger.info('IN')
+
+            variations = []
+            for variation in self.variations:
+                if not variation.product_id:
+                    raise Exception("El producto a actualizar no tiene ID")
+                variations.append({'id': variation.product_id, 'available_quantity': variation.available_quantity})
+
+            _logger.info('IN')
+
+            body = {
+                'variations': variations,
+            }
+            _logger.info('ACTUALIZANDO CON BODY %s', body)
+            response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+            _logger.info('RESPONSE %s', response)
+            error_handler.RestErrorHandler.handle_error(response)
+            raise Warning('ROMPI')
+        else:
+            body = {
+                'available_quantity': self.available_quantity
+            }
+            response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+            error_handler.RestErrorHandler.handle_error(response)
+
+
+
+class Variant(object):
+
+    def __init__(self, attribute_combinations, available_quantity, price, pictures, sku):
+        self.attribute_combinations = attribute_combinations
+        self.available_quantity = available_quantity
+        self.price = price
+        self.pictures = pictures
+        self.sku = sku
+        self.product_id = None
+
+
+class AttributeCombination(object):
+
+    def __init__(self, attribute_id, value):
+        self.attribute_id = attribute_id
+        self.value = value
