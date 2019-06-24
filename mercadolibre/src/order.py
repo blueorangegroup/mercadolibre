@@ -15,8 +15,8 @@ class Buyer(object):
     @staticmethod
     def create_buyer_from_dic(dic):
         buyer = Buyer(dic.get('id'), dic.get('nickname'), dic.get('email'))
-        buyer.phone = ' '.join([dic.get('phone').get('area_code'), dic.get('phone').get('number')])
-        buyer.name = ' '.join([dic.get('first_name'), dic.get('last_name')])
+        buyer.phone = ' '.join([dic.get('phone', {}).get('area_code') or '', dic.get('phone', {}).get('number') or ''])
+        buyer.name = ' '.join([dic.get('first_name') or '', dic.get('last_name') or ''])
         billing_info = dic.get('billing_info', {})
         buyer.doc_number = billing_info.get('doc_number')
         buyer.doc_type = billing_info.get('doc_type')
@@ -25,14 +25,24 @@ class Buyer(object):
 
 class OrderItem(object):
 
-    def __init__(self, item_id, quantity, unit_price):
+    def __init__(self, item_id, quantity, unit_price, sku):
         self.item_id = item_id
         self.quantity = quantity
         self.unit_price = unit_price
+        self.sku = sku
 
     @staticmethod
     def create_items_from_dic(dic):
-        return [OrderItem(item.get('item').get('id'), item.get('quantity'), item.get('unit_price')) for item in dic]
+        items = []
+        for item in dic:
+            meli_item = OrderItem(
+                item.get('item').get('id'),
+                item.get('quantity'),
+                item.get('unit_price'),
+                item.get('item').get('seller_sku')
+            )
+            items.append(meli_item)
+        return items
 
 
 class Order(object):
@@ -45,6 +55,9 @@ class Order(object):
         self.items = items
         self.shipping = shipping
         self.pack_id = None
+        self.total_amount = None
+        self.shipping_amount = None
+        self.paid_amount = None
 
     @staticmethod
     def get_sale_info_from_resource(meli, resource):
@@ -56,4 +69,7 @@ class Order(object):
         shipping = ml_shipping.Shipping.create_shipping_from_dic(res.get('shipping'))
         order = Order(res.get('id'), res.get('currency_id'), res.get('status'), buyer, items, shipping)
         order.pack_id = res.get('pack_id')
+        order.total_amount = res.get('total_amount') or 0.0
+        order.shipping_amount = shipping.cost or 0.0
+        order.paid_amount = res.get('paid_amount') or 0.0
         return order

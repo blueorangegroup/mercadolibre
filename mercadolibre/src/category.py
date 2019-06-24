@@ -9,17 +9,25 @@ def get_category(meli, category_id):
 
 class Category(object):
 
-    def __init__(self, name, category_id):
+    def __init__(self, name, category_id, listing_allowed):
         self.name = name
         self.category_id = category_id
-        self.child_ids = []
+        self.listing_allowed = listing_allowed
 
     @staticmethod
     def get_main_categories_instances(meli_site):
-        return [Category(category.get('name'), category.get('id'))
+        # Las categorías principales no son publicables
+        return [Category(category.get('name'), category.get('id'), False)
                 for category in get_main_categories(meli_site).json()]
 
     @staticmethod
     def get_children_categories(meli, category_id):
-        return [Category(category.get('name'), category.get('id'))
-                for category in get_category(meli, category_id).json().get('children_categories', [])]
+        categories = []
+        for category in get_category(meli, category_id).json().get('children_categories', []):
+            sub_category = get_category(meli, category.get('id')).json()
+            categories.append(Category(
+                sub_category.get('name'),
+                sub_category.get('id'),
+                sub_category.get('settings', {}).get('listing_allowed'))
+            )
+        return categories

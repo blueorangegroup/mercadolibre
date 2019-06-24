@@ -1,6 +1,10 @@
 from . import error_handler
 
 
+def get_publication_from_id(meli, product_id):
+    return meli.get_with_token('/items/{}/variations'.format(product_id))
+
+
 class Product(object):
 
     def __init__(self, title, category_id, price, currency_id, available_quantity, listing_type_id):
@@ -31,7 +35,9 @@ class Product(object):
             'condition': self.condition,
             'video_id': self.video_id,
             'pictures': self.pictures,
-            'description': self.description,
+            'description': {
+                'plain_text': self.description,
+            }
         }
         if self.variations:
             body['variations'] = [
@@ -83,13 +89,7 @@ class Product(object):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
 
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info('PORACTU')
-        _logger.info('VARIATIONS %s', self.variations)
-
         if self.variations:
-            _logger.info('IN')
 
             variations = []
             for variation in self.variations:
@@ -97,23 +97,17 @@ class Product(object):
                     raise Exception("El producto a actualizar no tiene ID")
                 variations.append({'id': variation.product_id, 'available_quantity': variation.available_quantity})
 
-            _logger.info('IN')
-
             body = {
                 'variations': variations,
             }
-            _logger.info('ACTUALIZANDO CON BODY %s', body)
             response = meli.put_with_token('/items/{}'.format(self.product_id), body)
-            _logger.info('RESPONSE %s', response)
             error_handler.RestErrorHandler.handle_error(response)
-            raise Warning('ROMPI')
         else:
             body = {
                 'available_quantity': self.available_quantity
             }
             response = meli.put_with_token('/items/{}'.format(self.product_id), body)
             error_handler.RestErrorHandler.handle_error(response)
-
 
 
 class Variant(object):

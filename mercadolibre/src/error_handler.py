@@ -8,9 +8,6 @@ class RestErrorHandler:
     @staticmethod
     def handle_error(response):
         response = response.json()
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info('RESPONSE %s', response)
         if 'error' in response:
             message = response.get('message')
             if message == 'invalid_token':

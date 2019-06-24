@@ -1,4 +1,4 @@
- #!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 from requests.adapters import HTTPAdapter
@@ -16,4 +16,3 @@ class SSLAdapter(HTTPAdapter):
                                        maxsize=maxsize,
                                        block=block,
                                        ssl_version=self.ssl_version)
-
