@@ -18,6 +18,7 @@ class Product(object):
         self.condition = None
         self.video_id = None
         self.pictures = []
+        self.shipping_mode = None
         self.product_id = None
         self.permalink = None
         self.description = None
@@ -39,6 +40,11 @@ class Product(object):
                 'plain_text': self.description,
             }
         }
+        if self.shipping_mode:
+            body['shipping'] = {
+                'mode': self.shipping_mode
+            }
+
         if self.variations:
             body['variations'] = [
                 {
@@ -85,7 +91,7 @@ class Product(object):
         response = meli.put_with_token('/items/{}'.format(self.product_id), body)
         error_handler.RestErrorHandler.handle_error(response)
 
-    def update(self, meli):
+    def update_stock(self, meli):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
 

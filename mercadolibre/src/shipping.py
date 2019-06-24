@@ -16,6 +16,8 @@ class Shipping(object):
         self.city = None
         self.state = None
         self.cost = None
+        self.logistic_type = None
+        self.shipping_method_name = None
 
     @staticmethod
     def create_shipping_from_dic(dic):
@@ -30,6 +32,7 @@ class Shipping(object):
         shipping.city = address.get('city', {}).get('name')
         shipping.state = address.get('state', {}).get('name')
         shipping.cost = dic.get('cost')
-
+        shipping.logistic_type = dic.get('logistic_type')
+        shipping.shipping_method_name = dic.get('shipping_option', {}).get('name')
         return shipping
 

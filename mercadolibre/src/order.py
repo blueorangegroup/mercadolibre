@@ -1,4 +1,4 @@
-from mercadolibre.src import error_handler, shipping as ml_shipping
+from mercadolibre.src import error_handler, utils, shipping as ml_shipping
 
 
 def get_order_from_resource(meli, resource):
@@ -58,6 +58,7 @@ class Order(object):
         self.total_amount = None
         self.shipping_amount = None
         self.paid_amount = None
+        self.date_closed = None
 
     @staticmethod
     def get_sale_info_from_resource(meli, resource):
@@ -72,4 +73,6 @@ class Order(object):
         order.total_amount = res.get('total_amount') or 0.0
         order.shipping_amount = shipping.cost or 0.0
         order.paid_amount = res.get('paid_amount') or 0.0
+        if res.get('date_closed'):
+            order.date_closed = utils.iso8601_to_datetime_utc(res.get('date_closed'))
         return order
