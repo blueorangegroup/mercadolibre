@@ -7,7 +7,8 @@ def get_publication_from_id(meli, product_id):
 
 class Product(object):
 
-    def __init__(self, title, category_id, price, currency_id, available_quantity, listing_type_id):
+    def __init__(self, title=None, category_id=None, price=None, currency_id=None,
+                 available_quantity=None, listing_type_id=None):
         self.title = title
         self.category_id = category_id
         self.price = price
@@ -23,6 +24,7 @@ class Product(object):
         self.permalink = None
         self.description = None
         self.variations = []
+        self.sku = None
 
     def publish(self, meli):
         body = {
@@ -44,6 +46,9 @@ class Product(object):
             body['shipping'] = {
                 'mode': self.shipping_mode
             }
+
+        if self.sku:
+            body['seller_custom_field'] = self.sku
 
         if self.variations:
             body['variations'] = [
@@ -96,12 +101,15 @@ class Product(object):
             raise Exception("El producto a actualizar no tiene ID")
 
         if self.variations:
-
             variations = []
             for variation in self.variations:
                 if not variation.product_id:
                     raise Exception("El producto a actualizar no tiene ID")
-                variations.append({'id': variation.product_id, 'available_quantity': variation.available_quantity})
+                vals = {'id': variation.product_id}
+                if variation.available_quantity:
+                    vals['available_quantity'] = variation.available_quantity
+
+                variations.append(vals)
 
             body = {
                 'variations': variations,
@@ -118,7 +126,7 @@ class Product(object):
 
 class Variant(object):
 
-    def __init__(self, attribute_combinations, available_quantity, price, pictures, sku):
+    def __init__(self, attribute_combinations=None, available_quantity=None, price=None, pictures=None, sku=None):
         self.attribute_combinations = attribute_combinations
         self.available_quantity = available_quantity
         self.price = price

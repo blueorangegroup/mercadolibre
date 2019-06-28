@@ -35,11 +35,12 @@ class OrderItem(object):
     def create_items_from_dic(dic):
         items = []
         for item in dic:
+            dic_item = item.get('item')
             meli_item = OrderItem(
-                item.get('item').get('id'),
+                dic_item.get('id'),
                 item.get('quantity'),
                 item.get('unit_price'),
-                item.get('item').get('seller_sku')
+                dic_item.get('seller_sku') or dic_item.get('seller_custom_field')
             )
             items.append(meli_item)
         return items
@@ -67,7 +68,7 @@ class Order(object):
         res = res.json()
         buyer = Buyer.create_buyer_from_dic(res.get('buyer'))
         items = OrderItem.create_items_from_dic(res.get('order_items'))
-        shipping = ml_shipping.Shipping.create_shipping_from_dic(res.get('shipping'))
+        shipping = ml_shipping.Shipping.create_shipping_from_id(meli, res.get('shipping', {}).get('id'))
         order = Order(res.get('id'), res.get('currency_id'), res.get('status'), buyer, items, shipping)
         order.pack_id = res.get('pack_id')
         order.total_amount = res.get('total_amount') or 0.0
@@ -75,4 +76,11 @@ class Order(object):
         order.paid_amount = res.get('paid_amount') or 0.0
         if res.get('date_closed'):
             order.date_closed = utils.iso8601_to_datetime_utc(res.get('date_closed'))
+        # payments = res.get('payments')
+        # # Tomamos como fecha de cierre de la orden la fecha del último pago aprobado
+        # if payments and any(payment.get('date_approved') for payment in payments):
+        #     order.date_closed = max(
+        #         utils.iso8601_to_datetime_utc(payment.get('date_approved')) for payment in res.get('payments')
+        #         if payment.get('date_approved')
+        #     )
         return order

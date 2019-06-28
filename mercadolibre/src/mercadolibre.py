@@ -12,18 +12,6 @@ class Mercadolibre(meli.Meli):
             refresh_token=refresh_token
         )
 
-    def get_access_token(self):
-        if self.access_token:
-            return self.access_token
-        app_client_values = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "client_credentials"
-        }
-        access_data = self.post("/oauth/token", body=None, params=app_client_values)
-        if access_data.status_code == 200:
-            self.access_token = eval(access_data.content)['access_token']
-
     def post_with_token(self, path, body=None, extra_headers=None):
         return self.post(path, body=body, params={'access_token': self.access_token}, extra_headers=extra_headers)
 
