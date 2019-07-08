@@ -2,7 +2,7 @@
 
 def get_shippings_tags(meli, shipping_ids):
     response = meli.get('/shipment_labels', {'access_token': meli.access_token, 'shipment_ids': shipping_ids})
-    if response.status_code in [400, 404]:
+    if not response.ok:
         raise Exception("Hubo un error al intentar descargar la(s) etiqueta(s)")
     return response.content
 
@@ -42,4 +42,3 @@ class Shipping(object):
         shipping.cost = dic.get('shipping_option', {}).get('cost')
         shipping.shipping_method_name = dic.get('shipping_option', {}).get('name')
         return shipping
-
