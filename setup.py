@@ -7,7 +7,7 @@ install_requires = [
 
 setup(
     name='mercadolibre',
-    version='1.2.1',
+    version='1.2.2',
     description='Mercadolibre',
     long_description='Mercadolibre',
     author='BLUEORANGE GROUP SRL',
