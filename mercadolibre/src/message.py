@@ -20,7 +20,16 @@ class Message(object):
         self.text = text
         self.attachments = None
 
-    def send_messages(self, meli_site):
+    def send_messages(self, meli):
+        """
+        Intenta enviar un mensaje interno en mercadolibre para un recurso.
+        Si la mensajería está bloqueada devuelve False
+        """
+        # Verificamos si acepta mensajería antes de enviar el mensaje
+        res = meli.get_with_token('/messages/{}/{}'.format(self.resource, self.resource_id))
+        error_handler.RestErrorHandler.handle_error(res)
+        if res.json().get('conversation', {}).get('status') == 'blocked':
+            return False
         item = {
             'from': {'user_id': self.seller_id},
             'to': [{"user_id": self.buyer_id, "resource": self.resource,
@@ -31,12 +40,11 @@ class Message(object):
             attachments = []
             for attachment in self.attachments:
                 attachment_file = {'file': (unidecode(attachment.name), attachment.attachment, "application/pdf")}
-                response = meli_site.upload(
+                response = meli.upload(
                     '/messages/attachments',
                     attachment_file,
-                    {'access_token': meli_site.access_token}
+                    {'access_token': meli.access_token}
                 )
-
                 if not response.ok:
                     raise Exception("Hubo un error al intentar subir el adjunto en mercadolibre: {}".format(
                         response.json().get('message')
@@ -46,5 +54,6 @@ class Message(object):
 
             item['attachments'] = attachments
 
-        res = meli_site.post_with_token('/messages', item)
+        res = meli.post_with_token('/messages', item)
         error_handler.RestErrorHandler.handle_error(res)
+        return True

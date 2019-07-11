@@ -23,6 +23,8 @@ class Shipping(object):
         self.cost = None
         self.logistic_type = None
         self.shipping_method_name = None
+        self.tracking_number = None
+        self.tracking_method = None
 
     @staticmethod
     def create_shipping_from_id(meli, shipping_id):
@@ -39,6 +41,8 @@ class Shipping(object):
         shipping.city = address.get('city', {}).get('name')
         shipping.state = address.get('state', {}).get('name')
         shipping.logistic_type = dic.get('logistic_type')
+        shipping.tracking_number = dic.get('tracking_number')
+        shipping.tracking_method = dic.get('tracking_method')
         shipping.cost = dic.get('shipping_option', {}).get('cost')
         shipping.shipping_method_name = dic.get('shipping_option', {}).get('name')
         return shipping
