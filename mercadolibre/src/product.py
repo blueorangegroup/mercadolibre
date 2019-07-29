@@ -26,8 +26,8 @@ class Product(object):
         self.variations = []
         self.sku = None
 
-    def publish(self, meli):
-        body = {
+    def get_body(self):
+        return {
             'title': self.title,
             'category_id': self.category_id,
             'price': self.price,
@@ -42,6 +42,9 @@ class Product(object):
                 'plain_text': self.description,
             }
         }
+
+    def publish(self, meli):
+        body = self.get_body()
         if self.shipping_mode:
             body['shipping'] = {
                 'mode': self.shipping_mode
