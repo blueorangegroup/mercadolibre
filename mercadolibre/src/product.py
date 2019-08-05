@@ -5,6 +5,10 @@ def get_publication_from_id(meli, product_id):
     return meli.get_with_token('/items/{}/variations'.format(product_id))
 
 
+def get_publication_from_resource(meli, resource):
+    return meli.get_with_token(resource)
+
+
 class Product(object):
 
     def __init__(self, title=None, category_id=None, price=None, currency_id=None,
@@ -25,26 +29,41 @@ class Product(object):
         self.description = None
         self.variations = []
         self.sku = None
+        self.status = None
+
+    @staticmethod
+    def get_product_from_resource(meli, resource):
+        res = get_publication_from_resource(meli, resource)
+        error_handler.RestErrorHandler.handle_error(res)
+        res = res.json()
+        # La descripción del producto no es informada en el get, así que no podemos actualizarla.
+        product = Product(res.get('title'), res.get('category_id'), res.get('price'), res.get('currency_id'),
+                          res.get('available_quantity'), res.get('listing_type_id'))
+        product.buying_mode = res.get('buying_mode')
+        product.condition = res.get('condition')
+        product.video_id = res.get('video_id')
+        product.pictures = res.get('pictures')
+        product.shipping_mode = res.get('shipping', {}).get('mode')
+        product.product_id = res.get('id')
+        product.permalink = res.get('permalink')
+        product.status = res.get('status')
+        return product
 
     def get_body(self):
-        return {
+        body = {
             'title': self.title,
             'category_id': self.category_id,
             'price': self.price,
-            'currency_id': self.currency_id,
-            'available_quantity': self.available_quantity,
             'listing_type_id': self.listing_type_id,
             'buying_mode': self.buying_mode,
             'condition': self.condition,
             'video_id': self.video_id,
             'pictures': self.pictures,
+            'available_quantity': self.available_quantity,
             'description': {
                 'plain_text': self.description,
             }
         }
-
-    def publish(self, meli):
-        body = self.get_body()
         if self.shipping_mode:
             body['shipping'] = {
                 'mode': self.shipping_mode
@@ -53,6 +72,13 @@ class Product(object):
         if self.sku:
             body['seller_custom_field'] = self.sku
 
+        return body
+
+    def publish(self, meli):
+        body = self.get_body()
+        body.update({
+            'currency_id': self.currency_id
+        })
         if self.variations:
             body['variations'] = [
                 {
@@ -70,7 +96,7 @@ class Product(object):
                             "id": "SELLER_SKU",
                             "value_name": variant.sku,
                         }
-                    ],
+                    ] + variant.attributes,
                     'picture_ids': variant.pictures
                 }
                 for variant in self.variations
@@ -91,6 +117,55 @@ class Product(object):
                             variation.product_id = meli_variation.get('id')
 
         self.permalink = res.get('permalink')
+
+    def update(self, meli):
+        body = self.get_body()
+        # La descripción se actualiza con un put aislado
+        description = body.get('description', {}).get('plain_text', '')
+        body.pop('description')
+        # El manejo de fotos es a parte
+        body.pop('pictures')
+        # Estos campos no se pueden sincronizar en publicaciones con ventas.
+        body.pop('category_id')
+        body.pop('buying_mode')
+        body.pop('condition')
+        body.pop('listing_type_id')
+        if self.variations:
+            body.pop('price')
+            body.pop('available_quantity')
+            body['variations'] = [
+                {
+                    'id': variant.product_id,
+                    'price': variant.price,
+                    'available_quantity': variant.available_quantity
+                }
+                for variant in self.variations
+            ]
+
+        try:
+            if description:
+                response = meli.put_with_token(
+                    '/items/{}/description'.format(self.product_id),
+                    {'plain_text': description}
+                )
+                error_handler.RestErrorHandler.handle_error(response)
+            response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+            error_handler.RestErrorHandler.handle_error(response)
+        except Exception as e:
+            raise Exception(e.args[0])
+
+    def update_pictures(self, meli):
+        body = {'pictures': self.pictures}
+        if self.variations:
+            variations = []
+            for variation in self.variations:
+                variations.append({'id': variation.product_id, 'picture_ids': variation.pictures})
+                for picture in variation.pictures:
+                    body['pictures'].append({'id': picture})
+            body['variations'] = variations
+
+        response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+        error_handler.RestErrorHandler.handle_error(response)
 
     def update_status(self, meli, state):
         body = {
@@ -136,6 +211,7 @@ class Variant(object):
         self.pictures = pictures
         self.sku = sku
         self.product_id = None
+        self.attributes = []
 
 
 class AttributeCombination(object):
