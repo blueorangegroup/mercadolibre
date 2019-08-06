@@ -84,8 +84,8 @@ class Product(object):
                 {
                     'attribute_combinations': [
                         {
-                            "id": attribute.attribute_id,
-                            "value_id": attribute.value,
+                            "name": attribute.attribute_id,
+                            "value_name": attribute.value,
                         }
                         for attribute in variant.attribute_combinations
                     ],
