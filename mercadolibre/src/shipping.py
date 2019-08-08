@@ -11,6 +11,10 @@ def get_shipping(meli, shipping_id):
     return meli.get_with_token('/shipments/{}'.format(shipping_id))
 
 
+def get_shipment_from_resource(meli, resource):
+    return meli.get_with_token('{}'.format(resource))
+
+
 class Shipping(object):
 
     def __init__(self, shipping_id=None):
@@ -25,6 +29,15 @@ class Shipping(object):
         self.shipping_method_name = None
         self.tracking_number = None
         self.tracking_method = None
+
+    @staticmethod
+    def get_order_id_from_shipment_resource(meli, shipping_id):
+        try:
+            dic = get_shipment_from_resource(meli, shipping_id).json()
+        except Exception:
+            return ''
+
+        return dic.get('order_id')
 
     @staticmethod
     def create_shipping_from_id(meli, shipping_id):
