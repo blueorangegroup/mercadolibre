@@ -51,15 +51,23 @@ class Product(object):
         product.permalink = res.get('permalink')
         product.status = res.get('status')
         product.sku = res.get('seller_custom_field')
+        if not product.sku:
+            for attribute in res.get('attributes', []):
+                if attribute.get('id') == 'SELLER_SKU':
+                    product.sku = attribute.get('value_name')
+                    break
+
         if res.get('variations'):
             variations = []
             for variation in res.get('variations'):
                 new_variation = Variant()
                 new_variation.product_id = variation.get('id')
-                for attribute in variation.get('attributes'):
-                    if attribute.get('id') == 'SELLER_SKU':
-                        new_variation.sku = attribute.get('value_name')
-                        break
+                new_variation.sku = variation.get('seller_custom_field')
+                if not new_variation.sku:
+                    for attribute in variation.get('attributes'):
+                        if attribute.get('id') == 'SELLER_SKU':
+                            new_variation.sku = attribute.get('value_name')
+                            break
                 variations.append(new_variation)
             product.variations = variations
         return product
