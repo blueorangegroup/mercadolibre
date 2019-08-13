@@ -2,11 +2,11 @@ from . import error_handler
 
 
 def get_publication_from_id(meli, product_id):
-    return meli.get_with_token('/items/{}/variations'.format(product_id))
+    return meli.get_with_token('/items/{}?include_attributes=all'.format(product_id))
 
 
-def get_publication_from_resource(meli, resource):
-    return meli.get_with_token(resource)
+def get_publication_description_from_id(meli, product_id):
+    return meli.get_with_token('/items/{}/description'.format(product_id))
 
 
 class Product(object):
@@ -32,13 +32,16 @@ class Product(object):
         self.status = None
 
     @staticmethod
-    def get_product_from_resource(meli, resource):
-        res = get_publication_from_resource(meli, resource)
+    def get_product_from_id(meli, product_id):
+        res = get_publication_from_id(meli, product_id)
         error_handler.RestErrorHandler.handle_error(res)
+        description = get_publication_from_id(meli, product_id)
+        error_handler.RestErrorHandler.handle_error(description)
         res = res.json()
         # La descripción del producto no es informada en el get, así que no podemos actualizarla.
         product = Product(res.get('title'), res.get('category_id'), res.get('price'), res.get('currency_id'),
                           res.get('available_quantity'), res.get('listing_type_id'))
+        product.description = description.json().get('plain_text')
         product.buying_mode = res.get('buying_mode')
         product.condition = res.get('condition')
         product.video_id = res.get('video_id')
@@ -47,6 +50,18 @@ class Product(object):
         product.product_id = res.get('id')
         product.permalink = res.get('permalink')
         product.status = res.get('status')
+        product.sku = res.get('seller_custom_field')
+        if res.get('variations'):
+            variations = []
+            for variation in res.get('variations'):
+                new_variation = Variant()
+                new_variation.product_id = variation.get('id')
+                for attribute in variation.get('attributes'):
+                    if attribute.get('id') == 'SELLER_SKU':
+                        new_variation.sku = attribute.get('value_name')
+                        break
+                variations.append(new_variation)
+            product.variations = variations
         return product
 
     def get_body(self):

@@ -31,3 +31,15 @@ class Category(object):
                 sub_category.get('settings', {}).get('listing_allowed'))
             )
         return categories
+
+    @staticmethod
+    def get_categories_to_root(meli, category_id):
+        categories = []
+        for category in get_category(meli, category_id).json().get('path_from_root', []):
+            res_category = get_category(meli, category.get('id')).json()
+            categories.append(Category(
+                res_category.get('name'),
+                res_category.get('id'),
+                res_category.get('settings', {}).get('listing_allowed'))
+            )
+        return categories
