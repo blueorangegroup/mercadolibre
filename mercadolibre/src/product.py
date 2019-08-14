@@ -207,8 +207,7 @@ class Product(object):
                 if not variation.product_id:
                     raise Exception("El producto a actualizar no tiene ID")
                 vals = {'id': variation.product_id}
-                if variation.available_quantity:
-                    vals['available_quantity'] = variation.available_quantity
+                vals['available_quantity'] = variation.available_quantity or 0.0
 
                 variations.append(vals)
 
