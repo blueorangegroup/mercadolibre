@@ -1,12 +1,16 @@
 from . import mercadolibre
+import requests
 
 
-class MercadoPago(mercadolibre.Mercadolibre):
+class Mercadopago(mercadolibre.Mercadolibre):
 
-    def post_payment(self, name, amount):
-        return self.post_with_token("/checkout/preferences", body={'items':[{
-            'title': name,
-            'quantity': 1,
-            'currency_id': 'ARS',
-            'unit_price': amount,
-        }]})
+    def __init__(self, client_id, client_secret, access_token=None, refresh_token=None):
+        super(Mercadopago, self).__init__(
+            client_id=client_id,
+            client_secret=client_secret,
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
+        self.API_ROOT_URL = "https://api.mercadopago.com"
+        self._requests = requests.Session()
+        self._requests.verify = False

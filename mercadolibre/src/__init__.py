@@ -26,6 +26,8 @@ from . import order
 from . import product
 from . import shipping
 from . import mercadopago
+from . import mercadopago_merchant_order
+from . import mercadopago_payment
 from . import utils
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
