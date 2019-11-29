@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     install_requires=install_requires,
     extras_require={},
-    package_data={},
+    package_data={'mercadolibre': ['python_sdk/lib/*',]},
     data_files=[],
     entry_points={},
 )
