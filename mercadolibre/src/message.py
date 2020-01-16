@@ -54,6 +54,6 @@ class Message(object):
 
             item['attachments'] = attachments
 
-        res = meli.post_with_token('/messages', item)
+        res = meli.post_with_token('/messages/{}/{}'.format(self.resource, self.resource_id), item)
         error_handler.RestErrorHandler.handle_error(res)
         return True
