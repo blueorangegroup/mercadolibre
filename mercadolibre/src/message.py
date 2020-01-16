@@ -34,7 +34,7 @@ class Message(object):
             'from': {'user_id': self.seller_id},
             'to': [{"user_id": self.buyer_id, "resource": self.resource,
                     "resource_id": self.resource_id}],
-            'text': {"plain": self.text}
+            'text': self.text
         }
         if self.attachments:
             attachments = []
