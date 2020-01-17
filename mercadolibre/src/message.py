@@ -34,7 +34,7 @@ class Message(object):
             'from': {'user_id': self.seller_id},
             'to': [{"user_id": self.buyer_id, "resource": self.resource,
                     "resource_id": self.resource_id}],
-            'text': {"plain": self.text}
+            'text': self.text
         }
         if self.attachments:
             attachments = []
@@ -54,6 +54,6 @@ class Message(object):
 
             item['attachments'] = attachments
 
-        res = meli.post_with_token('/messages', item)
+        res = meli.post_with_token('/messages/{}/{}'.format(self.resource, self.resource_id), item)
         error_handler.RestErrorHandler.handle_error(res)
         return True
