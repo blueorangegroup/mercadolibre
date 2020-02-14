@@ -45,7 +45,7 @@ class Message(object):
                     attachment_file,
                     {'access_token': meli.access_token}
                 )
-                if not response.ok:
+                if not response.ok or not response.json().get('id'):
                     raise Exception("Hubo un error al intentar subir el adjunto en mercadolibre: {}".format(
                         response.json().get('message')
                     ))
