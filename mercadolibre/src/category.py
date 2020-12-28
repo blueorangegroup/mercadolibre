@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 
 def get_main_categories(meli_site):
     return meli_site.get_with_token('/categories')
