@@ -8,4 +8,6 @@ def attach_invoice(meli, order_id, files):
         {'access_token': meli.access_token}
     )
     error_handler.RestErrorHandler.handle_error(res)
+    if not res.ok:
+        raise Exception(res.json().get('message'))
     return res
