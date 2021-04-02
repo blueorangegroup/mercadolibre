@@ -21,13 +21,7 @@ class Meli(object):
         self.expires_in = None
         parser = ConfigParser()
         parser.read(os.path.dirname(os.path.abspath(__file__)) + '/config.ini')
-
-        self._requests = requests.Session()
-        try:
-            self.SSL_VERSION = parser.get('config', 'ssl_version')
-            self._requests.mount('https://', SSLAdapter(ssl_version=getattr(ssl, self.SSL_VERSION)))
-        except:
-            self._requests = requests
+        self._requests = requests
 
         self.API_ROOT_URL = parser.get('config', 'api_root_url')
         self.SDK_VERSION = parser.get('config', 'sdk_version')
