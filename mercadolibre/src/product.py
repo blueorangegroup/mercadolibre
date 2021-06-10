@@ -154,7 +154,9 @@ class Product(object):
         body.pop('condition')
         body.pop('listing_type_id')
         if self.variations:
-            body.pop('price')
+            # Si estoy actualizando una publicación con variantes, no debo enviar el price (se informa en las variantes)
+            if len(self.variations) > 1:
+                body.pop('price')
             body.pop('available_quantity')
             variations = []
             for variant in self.variations:
