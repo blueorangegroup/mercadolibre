@@ -99,6 +99,7 @@ class Product(object):
 
     def publish(self, meli):
         body = self.get_body()
+        description = body.get('description', {}).get('plain_text', '')
         body.update({
             'currency_id': self.currency_id
         })
@@ -130,6 +131,8 @@ class Product(object):
         res = response.json()
         self.product_id = res.get('id')
 
+        self.update_description(meli, description)
+
         # Tenemos que mapear el id de la variante matcheando por SKU
         if self.variations:
             for variation in self.variations:
@@ -140,6 +143,14 @@ class Product(object):
                             variation.product_id = meli_variation.get('id')
 
         self.permalink = res.get('permalink')
+
+    def update_description(self, meli, description):
+        if description:
+            response = meli.put_with_token(
+                '/items/{}/description'.format(self.product_id),
+                {'plain_text': description}
+            )
+            error_handler.RestErrorHandler.handle_error(response)
 
     def update(self, meli):
         body = self.get_body()
@@ -193,12 +204,7 @@ class Product(object):
             body['variations'] = variations
 
         try:
-            if description:
-                response = meli.put_with_token(
-                    '/items/{}/description'.format(self.product_id),
-                    {'plain_text': description}
-                )
-                error_handler.RestErrorHandler.handle_error(response)
+            self.update_description(meli, description)
             response = meli.put_with_token('/items/{}'.format(self.product_id), body)
             error_handler.RestErrorHandler.handle_error(response)
         except Exception as e:
