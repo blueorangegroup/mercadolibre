@@ -7,7 +7,7 @@ install_requires = [
 
 setup(
     name='mercadolibre',
-    version='1.4.1',
+    version='1.5.4',
     description='Mercadolibre',
     long_description='Mercadolibre',
     author='BLUEORANGE GROUP SRL',
@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     install_requires=install_requires,
     extras_require={},
-    package_data={},
+    package_data={'mercadolibre': ['python_sdk/lib/*',]},
     data_files=[],
     entry_points={},
 )

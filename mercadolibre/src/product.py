@@ -153,16 +153,43 @@ class Product(object):
         body.pop('condition')
         body.pop('listing_type_id')
         if self.variations:
-            body.pop('price')
+            # Si estoy actualizando una publicación con variantes, no debo enviar el price (se informa en las variantes)
+            if len(self.variations) > 1:
+                body.pop('price')
             body.pop('available_quantity')
-            body['variations'] = [
-                {
-                    'id': variant.product_id,
-                    'price': variant.price,
-                    'available_quantity': variant.available_quantity
-                }
-                for variant in self.variations
-            ]
+            variations = []
+            for variant in self.variations:
+                if variant.product_id:
+                    variant_attrs = {
+                        'price': variant.price,
+                        'available_quantity': variant.available_quantity,
+                        'id': variant.product_id,
+                    }
+                elif variant.attribute_combinations:
+                    # Caso de variacion nueva que no existia
+                    variant_attrs = {
+                        'attribute_combinations': [
+                            {
+                                "name": attribute.attribute_id,
+                                "value_name": attribute.value,
+                            }
+                            for attribute in variant.attribute_combinations
+                        ],
+                        'available_quantity': variant.available_quantity,
+                        'price': variant.price,
+                        'attributes': [
+                                          {
+                                              "id": "SELLER_SKU",
+                                              "value_name": variant.sku,
+                                          }
+                                      ] + variant.attributes,
+                        'picture_ids': variant.pictures
+                    }
+                else:
+                    continue
+                variations.append(variant_attrs)
+
+            body['variations'] = variations
 
         try:
             if description:
@@ -175,6 +202,13 @@ class Product(object):
             error_handler.RestErrorHandler.handle_error(response)
         except Exception as e:
             raise Exception(e.args[0])
+
+        for variation in self.variations:
+            for meli_variation in response.json().get('variations'):
+                for meli_attribute in meli_variation.get('attributes'):
+                    if meli_attribute.get('id') == 'SELLER_SKU' \
+                            and meli_attribute.get('value_name') == variation.sku:
+                        variation.product_id = meli_variation.get('id')
 
     def update_pictures(self, meli):
         body = {'pictures': self.pictures}

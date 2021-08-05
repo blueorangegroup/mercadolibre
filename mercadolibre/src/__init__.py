@@ -18,6 +18,7 @@
 
 from . import category
 from . import error_handler
+from . import fiscal_documents
 from . import image
 from . import listing_type
 from . import mercadolibre

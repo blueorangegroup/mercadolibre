@@ -21,13 +21,8 @@ class Meli(object):
         self.expires_in = None
         parser = ConfigParser()
         parser.read(os.path.dirname(os.path.abspath(__file__)) + '/config.ini')
-
         self._requests = requests.Session()
-        try:
-            self.SSL_VERSION = parser.get('config', 'ssl_version')
-            self._requests.mount('https://', SSLAdapter(ssl_version=getattr(ssl, self.SSL_VERSION)))
-        except:
-            self._requests = requests
+        self._requests = requests
 
         self.API_ROOT_URL = parser.get('config', 'api_root_url')
         self.SDK_VERSION = parser.get('config', 'sdk_version')
@@ -78,8 +73,18 @@ class Meli(object):
                 self.expires_in = response_info['expires_in']
                 return self.access_token
             else:
-                # response code isn't a 200; raise an exception
-                response.raise_for_status()
+                params['grant_type'] = 'client_credentials'
+                params.pop('refresh_token')
+                response = self._requests.post(uri, params=urlencode(params), headers=headers, data=params)
+                if response.ok:
+                    response_info = response.json()
+                    self.access_token = response_info['access_token']
+                    self.refresh_token = response_info['refresh_token']
+                    self.expires_in = response_info['expires_in']
+                    return self.access_token
+                else:
+                    # response code isn't a 200; raise an exception
+                    response.raise_for_status()
         else:
             raise Exception("Offline-Access is not allowed.")
 
