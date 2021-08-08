@@ -35,10 +35,9 @@ class Product(object):
     def get_product_from_id(meli, product_id):
         res = get_publication_from_id(meli, product_id)
         error_handler.RestErrorHandler.handle_error(res)
-        description = get_publication_from_id(meli, product_id)
+        description = get_publication_description_from_id(meli, product_id)
         error_handler.RestErrorHandler.handle_error(description)
         res = res.json()
-        # La descripción del producto no es informada en el get, así que no podemos actualizarla.
         product = Product(res.get('title'), res.get('category_id'), res.get('price'), res.get('currency_id'),
                           res.get('available_quantity'), res.get('listing_type_id'))
         product.description = description.json().get('plain_text')
