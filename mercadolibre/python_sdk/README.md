@@ -9,7 +9,7 @@ This is the official Python SDK for MercadoLibre's Platform.
 
 ## How do I use it?
 
-The first thing to do is to instance a ```Meli``` class. You'll need to give a ```clientId``` and a ```clientSecret```. You can obtain both after creating your own application. For more information on this please read: [creating an application](http://developers.mercadolibre.com/application-manager/)
+The first thing to do is to instance a ```Meli``` class. You'll need to give a ```clientId``` and a ```clientSecret``` and an ```auth_url```. You can obtain both after creating your own application. For more information on this please read: [creating an application](http://developers.mercadolibre.com/application-manager/)
 
 ### Including the Lib
 Include the lib meli in your project
@@ -27,7 +27,7 @@ Start the development!
 ### Create an instance of Meli class
 Simple like this
 ```python
-meli = Meli(client_id=1234, client_secret="a secret")
+meli = Meli(client_id=1234, client_secret="a secret", auth_url='https://auth.mercadolibre.com.ar')
 ```
 With this instance you can start working on MercadoLibre's APIs.
 
@@ -40,7 +40,7 @@ There are some design considerations worth to mention.
 3. If you already have the access_token and the refresh_token you can pass in the constructor
 
 ```python
-meli = Meli(client_id=1234, client_secret="a secret", access_token="Access_Token", refresh_token="Refresh_Token")
+meli = Meli(client_id=1234, client_secret="a secret", auth_url='https://auth.mercadolibre.com.ar', access_token="Access_Token", refresh_token="Refresh_Token")
 ```
 
 ## How do I redirect users to authorize my application?
