@@ -4,11 +4,12 @@ from mercadolibre.python_sdk.lib import meli
 
 class Mercadolibre(meli.Meli):
 
-    def __init__(self, client_id, client_secret, access_token=None, refresh_token=None):
+    def __init__(self, client_id, client_secret, auth_url, access_token=None, refresh_token=None):
         super(Mercadolibre, self).__init__(
             client_id=client_id,
             client_secret=client_secret,
             access_token=access_token,
+            auth_url=auth_url,
             refresh_token=refresh_token
         )
 

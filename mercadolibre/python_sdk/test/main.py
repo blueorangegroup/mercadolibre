@@ -14,7 +14,8 @@ class MeliTest(unittest.TestCase):
         self.REFRESH_TOKEN = "a refresh_token"
         self.NEW_ACCESS_TOKEN = "a new access_token"
         self.NEW_REFRESH_TOKEN = "a new refresh_token"
-        self.meli = Meli(client_id=self.CLIENT_ID, client_secret=self.CLIENT_SECRET, access_token=self.ACCESS_TOKEN,
+        self.meli = Meli(client_id=self.CLIENT_ID, client_secret=self.CLIENT_SECRET, 
+                         auth_url='https://auth.mercadolibre.com.ar', access_token=self.ACCESS_TOKEN,
                          refresh_token=self.REFRESH_TOKEN)
 
     # constructor tests
