@@ -4,10 +4,11 @@ import requests
 
 class Mercadopago(mercadolibre.Mercadolibre):
 
-    def __init__(self, client_id, client_secret, access_token=None, refresh_token=None):
+    def __init__(self, client_id, client_secret, auth_url, access_token=None, refresh_token=None):
         super(Mercadopago, self).__init__(
             client_id=client_id,
             client_secret=client_secret,
+            auth_url=auth_url,
             access_token=access_token,
             refresh_token=refresh_token
         )

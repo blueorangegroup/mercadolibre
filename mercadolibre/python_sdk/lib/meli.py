@@ -13,7 +13,7 @@ import ssl
 
 class Meli(object):
 
-    def __init__(self, client_id, client_secret, access_token=None, refresh_token=None):
+    def __init__(self, client_id, client_secret, auth_url, access_token=None, refresh_token=None):
         self.client_id = client_id
         self.client_secret = client_secret
         self.access_token = access_token
@@ -26,7 +26,7 @@ class Meli(object):
 
         self.API_ROOT_URL = parser.get('config', 'api_root_url')
         self.SDK_VERSION = parser.get('config', 'sdk_version')
-        self.AUTH_URL = parser.get('config', 'auth_url')
+        self.AUTH_URL = auth_url
         self.OAUTH_URL = parser.get('config', 'oauth_url')
 
     # AUTH METHODS
