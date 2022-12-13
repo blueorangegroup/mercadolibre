@@ -3,7 +3,8 @@ from . import mercadolibre
 
 class MercadolibreSite(mercadolibre.Mercadolibre):
 
-    def __init__(self, client_id, client_secret, auth_url, access_token=None, refresh_token=None, site='MLA'):
+    def __init__(self, client_id, client_secret, auth_url='https://auth.mercadolibre.com.ar',
+                 access_token=None, refresh_token=None, site='MLA'):
         super(MercadolibreSite, self).__init__(
             client_id=client_id,
             client_secret=client_secret,
