@@ -13,7 +13,8 @@ import ssl
 
 class Meli(object):
 
-    def __init__(self, client_id, client_secret, auth_url, access_token=None, refresh_token=None):
+    def __init__(self, client_id, client_secret, auth_url='https://auth.mercadolibre.com.ar',
+                 access_token=None, refresh_token=None):
         self.client_id = client_id
         self.client_secret = client_secret
         self.access_token = access_token
