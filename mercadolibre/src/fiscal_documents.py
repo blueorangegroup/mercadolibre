@@ -1,4 +1,5 @@
 from mercadolibre.src import error_handler
+from simplejson import errors
 
 
 class InvoiceAttachedException(Exception):
@@ -11,10 +12,15 @@ def attach_invoice(meli, order_id, files):
         files,
         {'access_token': meli.access_token}
     )
-    error_handler.RestErrorHandler.handle_error(res)
-    if not res.ok:
-        message = res.json().get('message')
-        if 'a file already exists' in message:
+    try:
+        error_handler.RestErrorHandler.handle_error(res)
+        if not res.ok:
+            message = res.json().get('message')
+            if 'a file already exists' in message:
+                raise InvoiceAttachedException("La orden {} ya tiene un adjunto de factura.".format(order_id))
+            raise Exception(message)
+        return res
+    except errors.JSONDecodeError as e:
+        if 'a file already exists' in res.text:
             raise InvoiceAttachedException("La orden {} ya tiene un adjunto de factura.".format(order_id))
-        raise Exception(message)
-    return res
+        raise e
