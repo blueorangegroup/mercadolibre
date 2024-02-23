@@ -25,6 +25,7 @@ class Product(object):
         self.pictures = []
         self.shipping_mode = None
         self.product_id = None
+        self.user_product_id = None
         self.permalink = None
         self.description = None
         self.variations = []
@@ -261,6 +262,25 @@ class Product(object):
             }
             response = meli.put_with_token('/items/{}'.format(self.product_id), body)
             error_handler.RestErrorHandler.handle_error(response)
+    
+    def update_hybrid_stock(self, meli):
+        if not (self.product_id and self.user_product_id):
+            raise Exception("El producto a actualizar no tiene ID")
+
+        if self.variations:
+            # TODO: actualizar variaciones híbridas
+            return
+        else:
+            user_product_data = meli.get_with_token('/user-products/{}/stock'.format(self.user_product_id))
+            if not any(l['type'] == 'selling_address' for l in user_product_data.json().get('locations', [])):
+                return
+            header = {'x-version': user_product_data.headers['x-version']}
+            body = {
+                'quantity': int(self.available_quantity)
+            }
+            response = meli.put_with_token('/user-products/{}/stock/type/selling_address'.format(self.user_product_id), body=body, extra_headers=header)
+            if response.status_code != 204:
+                error_handler.RestErrorHandler.handle_error(response)
 
 
 class Variant(object):
