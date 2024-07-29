@@ -1,5 +1,7 @@
 from . import error_handler
 
+NOT_FOUND_STATUS = 404
+
 
 def get_publication_from_id(meli, product_id):
     return meli.get_with_token('/items/{}?include_attributes=all'.format(product_id))
@@ -37,11 +39,19 @@ class Product(object):
         res = get_publication_from_id(meli, product_id)
         error_handler.RestErrorHandler.handle_error(res)
         description = get_publication_description_from_id(meli, product_id)
-        error_handler.RestErrorHandler.handle_error(description)
+        # La API de Mercadolibre devuelve 404 si se hace get a la descripción de una publicación que no tiene, así que
+        # para evitar que se corte un flujo por eso hago manejo de errores solamente si no devolvió 404 (se espera que
+        # en caso de solicitar una publicación inexistente el error sea atrapado por el handler anterior, que evalúa el
+        # get al endpoint de items)
+        if description.json().get('status') != NOT_FOUND_STATUS:
+            error_handler.RestErrorHandler.handle_error(description)
+            description = description.json().get('plain_text')
+        else:
+            description = False
         res = res.json()
         product = Product(res.get('title'), res.get('category_id'), res.get('price'), res.get('currency_id'),
                           res.get('available_quantity'), res.get('listing_type_id'))
-        product.description = description.json().get('plain_text')
+        product.description = description
         product.buying_mode = res.get('buying_mode')
         product.condition = res.get('condition')
         product.video_id = res.get('video_id')
