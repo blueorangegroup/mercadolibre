@@ -274,12 +274,25 @@ class Product(object):
             error_handler.RestErrorHandler.handle_error(response)
     
     def update_hybrid_stock(self, meli):
-        if not (self.product_id and self.user_product_id):
+        if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
+        if not (self.variations or self.user_product_id):
+            raise Exception("El producto a actualizar no tiene ID de usuario")
+        if self.variations and not any(v.user_product_id for v in self.variations):
+            raise Exception("No se informó ID de usuario en ninguna de las variantes del producto")
 
         if self.variations:
-            # TODO: actualizar variaciones híbridas
-            return
+            for variation in self.variations:
+                user_product_data = meli.get_with_token('/user-products/{}/stock'.format(variation.user_product_id))
+                if not any(l['type'] == 'selling_address' for l in user_product_data.json().get('locations', [])):
+                    continue
+                header = {'x-version': user_product_data.headers['x-version']}
+                body = {
+                    'quantity': int(variation.available_quantity)
+                }
+                response = meli.put_with_token('/user-products/{}/stock/type/selling_address'.format(variation.user_product_id), body=body, extra_headers=header)
+                if response.status_code != 204:
+                    error_handler.RestErrorHandler.handle_error(response)
         else:
             user_product_data = meli.get_with_token('/user-products/{}/stock'.format(self.user_product_id))
             if not any(l['type'] == 'selling_address' for l in user_product_data.json().get('locations', [])):
@@ -302,6 +315,7 @@ class Variant(object):
         self.pictures = pictures
         self.sku = sku
         self.product_id = None
+        self.user_product_id = None
         self.attributes = []
 
 
