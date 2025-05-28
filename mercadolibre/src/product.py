@@ -31,6 +31,7 @@ class Product(object):
         self.permalink = None
         self.description = None
         self.variations = []
+        self.attributes = []
         self.sku = None
         self.status = None
 
@@ -104,6 +105,9 @@ class Product(object):
 
         if self.sku:
             body['seller_custom_field'] = self.sku
+
+        if self.attributes:
+            body['attributes'] = self.attributes
 
         return body
 
