@@ -23,4 +23,4 @@ def attach_invoice(meli, order_id, files):
     except errors.JSONDecodeError:
         if 'a file already exists' in res.text:
             raise InvoiceAttachedException("La orden {} ya tiene un adjunto de factura.".format(order_id))
-        raise Exception(res.text)
+        raise Exception(res.content)
