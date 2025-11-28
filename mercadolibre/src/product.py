@@ -309,6 +309,31 @@ class Product(object):
             if response.status_code != 204:
                 error_handler.RestErrorHandler.handle_error(response)
 
+    def update_price(self, meli):
+        if not self.product_id:
+            raise Exception("El producto a actualizar no tiene ID")
+
+        if self.variations:
+            variations = []
+            for variation in self.variations:
+                if not variation.product_id:
+                    raise Exception("El producto a actualizar no tiene ID")
+                vals = {'id': variation.product_id}
+                vals['price'] = variation.price
+
+                variations.append(vals)
+
+            body = {
+                'variations': variations,
+            }
+            response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+            error_handler.RestErrorHandler.handle_error(response)
+        else:
+            body = {
+                'price': self.price
+            }
+            response = meli.put_with_token('/items/{}'.format(self.product_id), body)
+            error_handler.RestErrorHandler.handle_error(response)
 
 class Variant(object):
 
