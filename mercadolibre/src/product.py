@@ -34,6 +34,7 @@ class Product(object):
         self.attributes = []
         self.sku = None
         self.status = None
+        self.installments_campaign_name = None
 
     @staticmethod
     def get_product_from_id(meli, product_id):
@@ -81,6 +82,12 @@ class Product(object):
                             break
                 variations.append(new_variation)
             product.variations = variations
+
+        if res.get('sale_terms'):
+            for term in res.get('sale_terms'):
+                if term.get('id') == 'INSTALLMENTS_CAMPAIGN':
+                    product.installments_campaign_name = term.get('value_name')
+                    break
         return product
 
     def get_body(self):
