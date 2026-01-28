@@ -9,11 +9,19 @@ class RestErrorHandler:
 
     @staticmethod
     def handle_error(response):
-        response = response.json()
-        if 'error' in response:
-            message = response.get('message')
-            if message in ['invalid_token', 'expired_token']:
-                raise InvalidTokenException('El token que está tratando de utilizar es inválido')
-            raise Exception("Error: {}\n{}".format(
-                message, '\n'.join([cause.get('message') for cause in response.get('cause', []) or []])
-            ))
+        response_json = response.json()
+        message = response_json.get('message')
+        full_message = message
+        cause = response_json.get('cause', []) or []
+        if cause:
+            full_message += "\n{}".format(
+                '\n'.join([c.get('message') for c in cause])
+            )
+        if response.status_code in [401, 403]:
+            raise InvalidTokenException(
+                'El token que está tratando de utilizar es inválido o no tiene los permisos necesarios para hacer esta acción. Error: {}'.format(
+                    full_message
+                )
+            )
+        elif response.status_code != 200:
+            raise Exception("Error: {}".format(full_message))
