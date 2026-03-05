@@ -23,5 +23,5 @@ class RestErrorHandler:
                     full_message
                 )
             )
-        elif response.status_code != 200:
+        elif not response.ok:
             raise Exception("Error: {}".format(full_message))
