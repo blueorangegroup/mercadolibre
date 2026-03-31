@@ -14,9 +14,19 @@ class RestErrorHandler:
         full_message = message
         cause = response_json.get('cause', []) or []
         if cause:
-            full_message += "\n{}".format(
-                '\n'.join([c.get('message') for c in cause])
-            )
+            cause_messages = []
+            cause_refs = []
+            for c in cause:
+                cause_messages.append(c.get('message', ''))
+                code = c.get('code', '')
+                references = c.get('references', [])
+                if references or code:
+                    ref = ', '.join(references) if references else ''
+                    parts = [p for p in [ref, code] if p]
+                    cause_refs.append(' - '.join(parts))
+            full_message += "\n{}".format('\n'.join(cause_messages))
+            if cause_refs:
+                full_message += "\nCódigo y referencia de error: {}".format('\n'.join(cause_refs))
         if response.status_code in [401, 403]:
             raise InvalidTokenException(
                 'El token que está tratando de utilizar es inválido o no tiene los permisos necesarios para hacer esta acción. Error: {}'.format(
