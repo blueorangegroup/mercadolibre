@@ -35,6 +35,7 @@ class Product(object):
         self.sku = None
         self.status = None
         self.installments_campaign_name = None
+        self.family_name = None
 
     @staticmethod
     def get_product_from_id(meli, product_id):
@@ -62,6 +63,7 @@ class Product(object):
         product.product_id = res.get('id')
         product.permalink = res.get('permalink')
         product.status = res.get('status')
+        product.family_name = res.get('family_name')
         product.sku = res.get('seller_custom_field')
         if not product.sku:
             for attribute in res.get('attributes', []):
@@ -101,6 +103,7 @@ class Product(object):
             'video_id': self.video_id,
             'pictures': self.pictures,
             'available_quantity': self.available_quantity,
+            'family_name': self.family_name,
             'description': {
                 'plain_text': self.description,
             }
@@ -175,6 +178,10 @@ class Product(object):
 
     def update(self, meli):
         body = self.get_body()
+        # Si la publicación tiene family_name puesto no actualizo el title, ya que va a dar error
+        if body.get('family_name'):
+            body.pop('title')
+            body.pop('family_name')
         # La descripción se actualiza con un put aislado
         description = body.get('description', {}).get('plain_text', '')
         body.pop('description')
