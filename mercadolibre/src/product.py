@@ -327,6 +327,19 @@ class Product(object):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
 
+        # Si no se informaron variaciones, consultamos la publicación en Mercado
+        # Libre: puede tener variaciones aunque el llamador no las haya cargado
+        # (caso típico: en Odoo la publicación no tiene variantes pero en ML sí).
+        # La API de ML rechaza un PUT con 'price' a nivel item cuando la
+        # publicación tiene variaciones, así que en ese caso replicamos el mismo
+        # precio a todas las variaciones (omitir alguna la eliminaría).
+        if not self.variations:
+            remote_product = self.get_product_from_id(meli, self.product_id)
+            if remote_product.variations:
+                for variation in remote_product.variations:
+                    variation.price = self.price
+                self.variations = remote_product.variations
+
         if self.variations:
             variations = []
             for variation in self.variations:
