@@ -64,24 +64,26 @@ class Product(object):
         product.permalink = res.get('permalink')
         product.status = res.get('status')
         product.family_name = res.get('family_name')
-        product.sku = res.get('seller_custom_field')
+        product.sku = None
+        for attribute in res.get('attributes', []):
+            if attribute.get('id') == 'SELLER_SKU':
+                product.sku = attribute.get('value_name')
+                break
         if not product.sku:
-            for attribute in res.get('attributes', []):
-                if attribute.get('id') == 'SELLER_SKU':
-                    product.sku = attribute.get('value_name')
-                    break
+            product.sku = res.get('seller_custom_field')
 
         if res.get('variations'):
             variations = []
             for variation in res.get('variations'):
                 new_variation = Variant()
                 new_variation.product_id = variation.get('id')
-                new_variation.sku = variation.get('seller_custom_field')
+                new_variation.sku = None
+                for attribute in variation.get('attributes'):
+                    if attribute.get('id') == 'SELLER_SKU':
+                        new_variation.sku = attribute.get('value_name')
+                        break
                 if not new_variation.sku:
-                    for attribute in variation.get('attributes'):
-                        if attribute.get('id') == 'SELLER_SKU':
-                            new_variation.sku = attribute.get('value_name')
-                            break
+                    new_variation.sku = variation.get('seller_custom_field')
                 variations.append(new_variation)
             product.variations = variations
 
@@ -113,11 +115,18 @@ class Product(object):
                 'mode': self.shipping_mode
             }
 
+        attributes = list(self.attributes) if self.attributes else []
+
+        # El SKU se mantiene en el atributo SELLER_SKU (forma correcta según la
+        # API de Mercado Libre). seller_custom_field queda como uso interno del
+        # vendedor y se completa por compatibilidad.
         if self.sku:
             body['seller_custom_field'] = self.sku
+            if not any(attr.get('id') == 'SELLER_SKU' for attr in attributes):
+                attributes.append({'id': 'SELLER_SKU', 'value_name': self.sku})
 
-        if self.attributes:
-            body['attributes'] = self.attributes
+        if attributes:
+            body['attributes'] = attributes
 
         return body
 
