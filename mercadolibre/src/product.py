@@ -332,6 +332,73 @@ class Product(object):
             if response.status_code != 204:
                 error_handler.RestErrorHandler.handle_error(response)
 
+    def _update_seller_warehouse_location_stock(self, meli, user_product_id, quantity):
+        """
+        Actualiza el stock de un user-product en una ubicación de tipo
+        seller_warehouse. Hace un GET para obtener la versión actual de stock
+        (header x-version) y las locations existentes, y un PUT respetando todos
+        los datos del GET, modificando únicamente el quantity.
+
+        Solo se actualiza cuando existe exactamente una location seller_warehouse.
+        Si hay más de una, no hay regla confiable para distribuir el stock total
+        de Odoo entre los distintos nodos, así que se omite la actualización.
+        """
+        user_product_data = meli.get_with_token('/user-products/{}/stock'.format(user_product_id))
+        error_handler.RestErrorHandler.handle_error(user_product_data)
+
+        locations = [
+            location for location in user_product_data.json().get('locations', [])
+            if location.get('type') == 'seller_warehouse'
+        ]
+        # Sin regla de distribución para múltiples nodos: omitimos la actualización.
+        if len(locations) != 1:
+            return False
+
+        location = locations[0]
+        header = {'x-version': user_product_data.headers['x-version']}
+        body = {
+            'locations': [
+                {
+                    'store_id': location.get('store_id'),
+                    'network_node_id': location.get('network_node_id'),
+                    'quantity': int(quantity),
+                }
+            ]
+        }
+        response = meli.put_with_token(
+            '/user-products/{}/stock/type/seller_warehouse'.format(user_product_id),
+            body=body,
+            extra_headers=header,
+        )
+        if response.status_code != 204:
+            error_handler.RestErrorHandler.handle_error(response)
+        return True
+
+    def update_seller_warehouse_stock(self, meli):
+        """
+        Actualiza el stock de publicaciones cuyas unidades de stock se gestionan
+        vía user-products (atributo user_product_id / product_user_id en el item
+        o en cada variación), usando el endpoint de stock por seller_warehouse.
+        """
+        if not self.product_id:
+            raise Exception("El producto a actualizar no tiene ID")
+        if not (self.variations or self.user_product_id):
+            raise Exception("El producto a actualizar no tiene ID de usuario")
+        if self.variations and not any(v.user_product_id for v in self.variations):
+            raise Exception("No se informó ID de usuario en ninguna de las variantes del producto")
+
+        if self.variations:
+            for variation in self.variations:
+                if not variation.user_product_id:
+                    continue
+                self._update_seller_warehouse_location_stock(
+                    meli, variation.user_product_id, variation.available_quantity or 0
+                )
+        else:
+            self._update_seller_warehouse_location_stock(
+                meli, self.user_product_id, self.available_quantity or 0
+            )
+
     def update_price(self, meli):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
