@@ -345,14 +345,23 @@ class Product(object):
         GET, modificando únicamente el quantity. El header x-version es obligatorio
         (ML responde 400 si no se envía).
 
-        Soporta dos tipos de ubicación:
+        Soporta dos tipos de ubicación actualizables por el vendedor:
         - selling_address: stock en el domicilio del vendedor, body {quantity}.
         - seller_warehouse: stock por depósito/nodo, body con locations. Solo se
           actualiza si existe exactamente una location, ya que no hay regla
           confiable para distribuir el stock total de Odoo entre varios nodos.
 
-        Si no se puede actualizar el stock lanza una excepción (fail fast): no
-        debe reportarse como actualizado algo que en realidad no se modificó.
+        Las locations de tipo meli_facility (stock alojado en Mercado Libre Full)
+        no las gestiona el vendedor y se ignoran. Un user-product con SOLO
+        meli_facility corresponde a una publicación Fulfillment pura: no hay nada
+        que actualizar, se retorna False sin error. En cambio una publicación
+        híbrida (Fulfillment con stock propio) trae además seller_warehouse, que
+        sí se actualiza.
+
+        Retorna True si actualizó stock, False si no había nada actualizable
+        (Full pura). Si hay una location actualizable pero la actualización falla,
+        lanza excepción (fail fast): no debe reportarse como actualizado algo que
+        en realidad no se modificó.
         """
         user_product_data = meli.get_with_token('/user-products/{}/stock'.format(user_product_id))
         error_handler.RestErrorHandler.handle_error(user_product_data)
@@ -375,13 +384,15 @@ class Product(object):
             location for location in locations
             if location.get('type') == 'seller_warehouse'
         ]
+        # Sin seller_warehouse (y sin selling_address, ya descartado arriba) no hay
+        # stock gestionado por el vendedor: es una publicación Fulfillment pura
+        # (solo meli_facility). No es un error, simplemente no hay nada que
+        # actualizar. Retornamos False para que el llamador no lo cuente como
+        # publicación sincronizada.
+        if not warehouse_locations:
+            return False
         # Sin regla de distribución para múltiples nodos no podemos actualizar de
         # forma confiable: fallamos en lugar de reportar un falso éxito.
-        if not warehouse_locations:
-            raise Exception(
-                "El user-product {} no tiene ubicaciones de stock actualizables "
-                "(selling_address o seller_warehouse)".format(user_product_id)
-            )
         if len(warehouse_locations) > 1:
             raise Exception(
                 "El user-product {} tiene múltiples ubicaciones seller_warehouse; "
@@ -413,6 +424,11 @@ class Product(object):
         vía user-products (atributo user_product_id en el item o en cada
         variación). Detecta automáticamente el tipo de ubicación de stock
         (selling_address o seller_warehouse) y actualiza en consecuencia.
+
+        Retorna True si se actualizó al menos un stock, False si no había nada
+        actualizable (p. ej. publicación Fulfillment pura, con stock solo en
+        meli_facility). El llamador usa este retorno para no contar como
+        sincronizada una publicación que en realidad no se modificó.
         """
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
@@ -426,18 +442,18 @@ class Product(object):
             for variation in self.variations:
                 if not variation.user_product_id:
                     continue
-                self._update_user_product_stock(
+                # _update_user_product_stock retorna False para Full puras (solo
+                # meli_facility): esas no cuentan como actualización real.
+                updated = self._update_user_product_stock(
                     meli, variation.user_product_id, variation.available_quantity or 0
                 )
-                updated_any = True
-            # Si el guard de arriba pasó pero ninguna de las variantes con stock a
-            # sincronizar tenía user_product_id, no se actualizó nada: fallamos.
-            if not updated_any:
-                raise Exception(
-                    "Ninguna variante con stock a sincronizar tenía user_product_id"
-                )
+                updated_any = updated_any or updated
+            # Si el guard de arriba pasó pero ninguna variante con user_product_id
+            # tenía stock actualizable (todas Full puras o sin user_product_id), no
+            # se actualizó nada.
+            return updated_any
         else:
-            self._update_user_product_stock(
+            return self._update_user_product_stock(
                 meli, self.user_product_id, self.available_quantity or 0
             )
 
