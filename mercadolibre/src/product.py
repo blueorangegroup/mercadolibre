@@ -301,6 +301,11 @@ class Product(object):
             error_handler.RestErrorHandler.handle_error(response)
     
     def update_hybrid_stock(self, meli):
+        # CÓDIGO MUERTO: no tiene llamadores en los repos actuales. Quedó obsoleto
+        # tras unificar la sincronización de stock de user-products en
+        # update_seller_warehouse_stock / _update_user_product_stock, que ya
+        # contempla el caso selling_address que este método manejaba. Conservado
+        # por si existiera algún consumidor externo; eliminar al confirmar que no.
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
         if not (self.variations or self.user_product_id):
@@ -332,30 +337,58 @@ class Product(object):
             if response.status_code != 204:
                 error_handler.RestErrorHandler.handle_error(response)
 
-    def _update_seller_warehouse_location_stock(self, meli, user_product_id, quantity):
+    def _update_user_product_stock(self, meli, user_product_id, quantity):
         """
-        Actualiza el stock de un user-product en una ubicación de tipo
-        seller_warehouse. Hace un GET para obtener la versión actual de stock
-        (header x-version) y las locations existentes, y un PUT respetando todos
-        los datos del GET, modificando únicamente el quantity.
+        Actualiza el stock de un user-product. Hace un GET para obtener la versión
+        actual de stock (header x-version) y las locations existentes, detecta el
+        tipo de location y arma el PUT correspondiente respetando los datos del
+        GET, modificando únicamente el quantity. El header x-version es obligatorio
+        (ML responde 400 si no se envía).
 
-        Solo se actualiza cuando existe exactamente una location seller_warehouse.
-        Si hay más de una, no hay regla confiable para distribuir el stock total
-        de Odoo entre los distintos nodos, así que se omite la actualización.
+        Soporta dos tipos de ubicación:
+        - selling_address: stock en el domicilio del vendedor, body {quantity}.
+        - seller_warehouse: stock por depósito/nodo, body con locations. Solo se
+          actualiza si existe exactamente una location, ya que no hay regla
+          confiable para distribuir el stock total de Odoo entre varios nodos.
+
+        Si no se puede actualizar el stock lanza una excepción (fail fast): no
+        debe reportarse como actualizado algo que en realidad no se modificó.
         """
         user_product_data = meli.get_with_token('/user-products/{}/stock'.format(user_product_id))
         error_handler.RestErrorHandler.handle_error(user_product_data)
 
-        locations = [
-            location for location in user_product_data.json().get('locations', [])
+        locations = user_product_data.json().get('locations', [])
+        header = {'x-version': user_product_data.headers['x-version']}
+
+        if any(location.get('type') == 'selling_address' for location in locations):
+            body = {'quantity': int(quantity)}
+            response = meli.put_with_token(
+                '/user-products/{}/stock/type/selling_address'.format(user_product_id),
+                body=body,
+                extra_headers=header,
+            )
+            if response.status_code != 204:
+                error_handler.RestErrorHandler.handle_error(response)
+            return True
+
+        warehouse_locations = [
+            location for location in locations
             if location.get('type') == 'seller_warehouse'
         ]
-        # Sin regla de distribución para múltiples nodos: omitimos la actualización.
-        if len(locations) != 1:
-            return False
+        # Sin regla de distribución para múltiples nodos no podemos actualizar de
+        # forma confiable: fallamos en lugar de reportar un falso éxito.
+        if not warehouse_locations:
+            raise Exception(
+                "El user-product {} no tiene ubicaciones de stock actualizables "
+                "(selling_address o seller_warehouse)".format(user_product_id)
+            )
+        if len(warehouse_locations) > 1:
+            raise Exception(
+                "El user-product {} tiene múltiples ubicaciones seller_warehouse; "
+                "no hay regla para distribuir el stock total".format(user_product_id)
+            )
 
-        location = locations[0]
-        header = {'x-version': user_product_data.headers['x-version']}
+        location = warehouse_locations[0]
         body = {
             'locations': [
                 {
@@ -377,8 +410,9 @@ class Product(object):
     def update_seller_warehouse_stock(self, meli):
         """
         Actualiza el stock de publicaciones cuyas unidades de stock se gestionan
-        vía user-products (atributo user_product_id / product_user_id en el item
-        o en cada variación), usando el endpoint de stock por seller_warehouse.
+        vía user-products (atributo user_product_id en el item o en cada
+        variación). Detecta automáticamente el tipo de ubicación de stock
+        (selling_address o seller_warehouse) y actualiza en consecuencia.
         """
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
@@ -388,14 +422,22 @@ class Product(object):
             raise Exception("No se informó ID de usuario en ninguna de las variantes del producto")
 
         if self.variations:
+            updated_any = False
             for variation in self.variations:
                 if not variation.user_product_id:
                     continue
-                self._update_seller_warehouse_location_stock(
+                self._update_user_product_stock(
                     meli, variation.user_product_id, variation.available_quantity or 0
                 )
+                updated_any = True
+            # Si el guard de arriba pasó pero ninguna de las variantes con stock a
+            # sincronizar tenía user_product_id, no se actualizó nada: fallamos.
+            if not updated_any:
+                raise Exception(
+                    "Ninguna variante con stock a sincronizar tenía user_product_id"
+                )
         else:
-            self._update_seller_warehouse_location_stock(
+            self._update_user_product_stock(
                 meli, self.user_product_id, self.available_quantity or 0
             )
 
