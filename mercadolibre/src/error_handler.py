@@ -13,7 +13,7 @@ class RestErrorHandler:
         message = response_json.get('message')
         full_message = message
         cause = response_json.get('cause', []) or []
-        if cause:
+        if cause and cause != ['[]']:
             cause_messages = []
             cause_refs = []
             for c in cause:

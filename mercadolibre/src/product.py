@@ -64,24 +64,26 @@ class Product(object):
         product.permalink = res.get('permalink')
         product.status = res.get('status')
         product.family_name = res.get('family_name')
-        product.sku = res.get('seller_custom_field')
+        product.sku = None
+        for attribute in res.get('attributes', []):
+            if attribute.get('id') == 'SELLER_SKU':
+                product.sku = attribute.get('value_name')
+                break
         if not product.sku:
-            for attribute in res.get('attributes', []):
-                if attribute.get('id') == 'SELLER_SKU':
-                    product.sku = attribute.get('value_name')
-                    break
+            product.sku = res.get('seller_custom_field')
 
         if res.get('variations'):
             variations = []
             for variation in res.get('variations'):
                 new_variation = Variant()
                 new_variation.product_id = variation.get('id')
-                new_variation.sku = variation.get('seller_custom_field')
+                new_variation.sku = None
+                for attribute in variation.get('attributes'):
+                    if attribute.get('id') == 'SELLER_SKU':
+                        new_variation.sku = attribute.get('value_name')
+                        break
                 if not new_variation.sku:
-                    for attribute in variation.get('attributes'):
-                        if attribute.get('id') == 'SELLER_SKU':
-                            new_variation.sku = attribute.get('value_name')
-                            break
+                    new_variation.sku = variation.get('seller_custom_field')
                 variations.append(new_variation)
             product.variations = variations
 
@@ -113,11 +115,18 @@ class Product(object):
                 'mode': self.shipping_mode
             }
 
+        attributes = list(self.attributes) if self.attributes else []
+
+        # El SKU se mantiene en el atributo SELLER_SKU (forma correcta según la
+        # API de Mercado Libre). seller_custom_field queda como uso interno del
+        # vendedor y se completa por compatibilidad.
         if self.sku:
             body['seller_custom_field'] = self.sku
+            if not any(attr.get('id') == 'SELLER_SKU' for attr in attributes):
+                attributes.append({'id': 'SELLER_SKU', 'value_name': self.sku})
 
-        if self.attributes:
-            body['attributes'] = self.attributes
+        if attributes:
+            body['attributes'] = attributes
 
         return body
 
@@ -292,6 +301,11 @@ class Product(object):
             error_handler.RestErrorHandler.handle_error(response)
     
     def update_hybrid_stock(self, meli):
+        # CÓDIGO MUERTO: no tiene llamadores en los repos actuales. Quedó obsoleto
+        # tras unificar la sincronización de stock de user-products en
+        # update_seller_warehouse_stock / _update_user_product_stock, que ya
+        # contempla el caso selling_address que este método manejaba. Conservado
+        # por si existiera algún consumidor externo; eliminar al confirmar que no.
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
         if not (self.variations or self.user_product_id):
@@ -323,9 +337,142 @@ class Product(object):
             if response.status_code != 204:
                 error_handler.RestErrorHandler.handle_error(response)
 
+    def _update_user_product_stock(self, meli, user_product_id, quantity):
+        """
+        Actualiza el stock de un user-product. Hace un GET para obtener la versión
+        actual de stock (header x-version) y las locations existentes, detecta el
+        tipo de location y arma el PUT correspondiente respetando los datos del
+        GET, modificando únicamente el quantity. El header x-version es obligatorio
+        (ML responde 400 si no se envía).
+
+        Soporta dos tipos de ubicación actualizables por el vendedor:
+        - selling_address: stock en el domicilio del vendedor, body {quantity}.
+        - seller_warehouse: stock por depósito/nodo, body con locations. Solo se
+          actualiza si existe exactamente una location, ya que no hay regla
+          confiable para distribuir el stock total de Odoo entre varios nodos.
+
+        Las locations de tipo meli_facility (stock alojado en Mercado Libre Full)
+        no las gestiona el vendedor y se ignoran. Un user-product con SOLO
+        meli_facility corresponde a una publicación Fulfillment pura: no hay nada
+        que actualizar, se retorna False sin error. En cambio una publicación
+        híbrida (Fulfillment con stock propio) trae además seller_warehouse, que
+        sí se actualiza.
+
+        Retorna True si actualizó stock, False si no había nada actualizable
+        (Full pura). Si hay una location actualizable pero la actualización falla,
+        lanza excepción (fail fast): no debe reportarse como actualizado algo que
+        en realidad no se modificó.
+        """
+        user_product_data = meli.get_with_token('/user-products/{}/stock'.format(user_product_id))
+        error_handler.RestErrorHandler.handle_error(user_product_data)
+
+        locations = user_product_data.json().get('locations', [])
+        header = {'x-version': user_product_data.headers['x-version']}
+
+        if any(location.get('type') == 'selling_address' for location in locations):
+            body = {'quantity': int(quantity)}
+            response = meli.put_with_token(
+                '/user-products/{}/stock/type/selling_address'.format(user_product_id),
+                body=body,
+                extra_headers=header,
+            )
+            if response.status_code != 204:
+                error_handler.RestErrorHandler.handle_error(response)
+            return True
+
+        warehouse_locations = [
+            location for location in locations
+            if location.get('type') == 'seller_warehouse'
+        ]
+        # Sin seller_warehouse (y sin selling_address, ya descartado arriba) no hay
+        # stock gestionado por el vendedor: es una publicación Fulfillment pura
+        # (solo meli_facility). No es un error, simplemente no hay nada que
+        # actualizar. Retornamos False para que el llamador no lo cuente como
+        # publicación sincronizada.
+        if not warehouse_locations:
+            return False
+        # Sin regla de distribución para múltiples nodos no podemos actualizar de
+        # forma confiable: fallamos en lugar de reportar un falso éxito.
+        if len(warehouse_locations) > 1:
+            raise Exception(
+                "El user-product {} tiene múltiples ubicaciones seller_warehouse; "
+                "no hay regla para distribuir el stock total".format(user_product_id)
+            )
+
+        location = warehouse_locations[0]
+        body = {
+            'locations': [
+                {
+                    'store_id': location.get('store_id'),
+                    'network_node_id': location.get('network_node_id'),
+                    'quantity': int(quantity),
+                }
+            ]
+        }
+        response = meli.put_with_token(
+            '/user-products/{}/stock/type/seller_warehouse'.format(user_product_id),
+            body=body,
+            extra_headers=header,
+        )
+        if response.status_code != 204:
+            error_handler.RestErrorHandler.handle_error(response)
+        return True
+
+    def update_seller_warehouse_stock(self, meli):
+        """
+        Actualiza el stock de publicaciones cuyas unidades de stock se gestionan
+        vía user-products (atributo user_product_id en el item o en cada
+        variación). Detecta automáticamente el tipo de ubicación de stock
+        (selling_address o seller_warehouse) y actualiza en consecuencia.
+
+        Retorna True si se actualizó al menos un stock, False si no había nada
+        actualizable (p. ej. publicación Fulfillment pura, con stock solo en
+        meli_facility). El llamador usa este retorno para no contar como
+        sincronizada una publicación que en realidad no se modificó.
+        """
+        if not self.product_id:
+            raise Exception("El producto a actualizar no tiene ID")
+        if not (self.variations or self.user_product_id):
+            raise Exception("El producto a actualizar no tiene ID de usuario")
+        if self.variations and not any(v.user_product_id for v in self.variations):
+            raise Exception("No se informó ID de usuario en ninguna de las variantes del producto")
+
+        if self.variations:
+            updated_any = False
+            for variation in self.variations:
+                if not variation.user_product_id:
+                    continue
+                # _update_user_product_stock retorna False para Full puras (solo
+                # meli_facility): esas no cuentan como actualización real.
+                updated = self._update_user_product_stock(
+                    meli, variation.user_product_id, variation.available_quantity or 0
+                )
+                updated_any = updated_any or updated
+            # Si el guard de arriba pasó pero ninguna variante con user_product_id
+            # tenía stock actualizable (todas Full puras o sin user_product_id), no
+            # se actualizó nada.
+            return updated_any
+        else:
+            return self._update_user_product_stock(
+                meli, self.user_product_id, self.available_quantity or 0
+            )
+
     def update_price(self, meli):
         if not self.product_id:
             raise Exception("El producto a actualizar no tiene ID")
+
+        # Si no se informaron variaciones, consultamos la publicación en Mercado
+        # Libre: puede tener variaciones aunque el llamador no las haya cargado
+        # (caso típico: en Odoo la publicación no tiene variantes pero en ML sí).
+        # La API de ML rechaza un PUT con 'price' a nivel item cuando la
+        # publicación tiene variaciones, así que en ese caso replicamos el mismo
+        # precio a todas las variaciones (omitir alguna la eliminaría).
+        if not self.variations:
+            remote_product = self.get_product_from_id(meli, self.product_id)
+            if remote_product.variations:
+                for variation in remote_product.variations:
+                    variation.price = self.price
+                self.variations = remote_product.variations
 
         if self.variations:
             variations = []
