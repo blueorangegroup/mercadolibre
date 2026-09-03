@@ -7,7 +7,7 @@ install_requires = [
 
 setup(
     name='mercadolibre',
-    version='2.4.3',
+    version='2.4.4',
     description='Mercadolibre',
     long_description='Mercadolibre',
     author='BLUEORANGE GROUP SRL',
@@ -23,7 +23,8 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     keywords='mercadolibre',
-    packages=find_packages(),
+    # Los tests no forman parte del paquete distribuido.
+    packages=find_packages(exclude=['tests', 'tests.*']),
     install_requires=install_requires,
     extras_require={},
     package_data={'mercadolibre': ['python_sdk/lib/*',]},

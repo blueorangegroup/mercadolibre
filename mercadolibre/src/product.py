@@ -337,7 +337,8 @@ class Product(object):
             if response.status_code != 204:
                 error_handler.RestErrorHandler.handle_error(response)
 
-    def _update_user_product_stock(self, meli, user_product_id, quantity):
+    def _update_user_product_stock(self, meli, user_product_id, quantity,
+                                   can_write_selling_address=True):
         """
         Actualiza el stock de un user-product. Hace un GET para obtener la versión
         actual de stock (header x-version) y las locations existentes, detecta el
@@ -358,6 +359,16 @@ class Product(object):
         híbrida (Fulfillment con stock propio) trae además seller_warehouse, que
         sí se actualiza.
 
+        La presencia de una location selling_address no alcanza para saber si el
+        vendedor la puede escribir: una publicación Fulfillment pura puede
+        arrastrar unidades congeladas en selling_address de antes de pasar a Full,
+        y ML rechaza el PUT con un error de "solo fulfillment". Quién puede
+        escribirla depende de la logística de la publicación, dato que la lib no
+        tiene acá, así que lo informa el llamador en can_write_selling_address.
+        El default es True para no cambiar el comportamiento de los llamadores que
+        no lo informan. seller_warehouse NO depende de este flag: las
+        publicaciones híbridas por depósito se actualizan siempre.
+
         Retorna True si actualizó stock, False si no había nada actualizable
         (Full pura). Si hay una location actualizable pero la actualización falla,
         lanza excepción (fail fast): no debe reportarse como actualizado algo que
@@ -369,7 +380,8 @@ class Product(object):
         locations = user_product_data.json().get('locations', [])
         header = {'x-version': user_product_data.headers['x-version']}
 
-        if any(location.get('type') == 'selling_address' for location in locations):
+        if can_write_selling_address \
+                and any(location.get('type') == 'selling_address' for location in locations):
             body = {'quantity': int(quantity)}
             response = meli.put_with_token(
                 '/user-products/{}/stock/type/selling_address'.format(user_product_id),
@@ -384,11 +396,12 @@ class Product(object):
             location for location in locations
             if location.get('type') == 'seller_warehouse'
         ]
-        # Sin seller_warehouse (y sin selling_address, ya descartado arriba) no hay
-        # stock gestionado por el vendedor: es una publicación Fulfillment pura
-        # (solo meli_facility). No es un error, simplemente no hay nada que
-        # actualizar. Retornamos False para que el llamador no lo cuente como
-        # publicación sincronizada.
+        # Sin seller_warehouse, y descartada arriba la selling_address escribible,
+        # no hay stock gestionado por el vendedor: es una publicación Fulfillment
+        # pura (solo meli_facility, o con selling_address congelada que ML no deja
+        # tocar). No es un error, simplemente no hay nada que actualizar.
+        # Retornamos False para que el llamador no lo cuente como publicación
+        # sincronizada.
         if not warehouse_locations:
             return False
         # Sin regla de distribución para múltiples nodos no podemos actualizar de
@@ -418,12 +431,17 @@ class Product(object):
             error_handler.RestErrorHandler.handle_error(response)
         return True
 
-    def update_seller_warehouse_stock(self, meli):
+    def update_seller_warehouse_stock(self, meli, can_write_selling_address=True):
         """
         Actualiza el stock de publicaciones cuyas unidades de stock se gestionan
         vía user-products (atributo user_product_id en el item o en cada
         variación). Detecta automáticamente el tipo de ubicación de stock
         (selling_address o seller_warehouse) y actualiza en consecuencia.
+
+        can_write_selling_address informa si el vendedor puede escribir la
+        location selling_address de esta publicación; ver
+        _update_user_product_stock. Es opcional y su default preserva el
+        comportamiento anterior.
 
         Retorna True si se actualizó al menos un stock, False si no había nada
         actualizable (p. ej. publicación Fulfillment pura, con stock solo en
@@ -445,7 +463,8 @@ class Product(object):
                 # _update_user_product_stock retorna False para Full puras (solo
                 # meli_facility): esas no cuentan como actualización real.
                 updated = self._update_user_product_stock(
-                    meli, variation.user_product_id, variation.available_quantity or 0
+                    meli, variation.user_product_id, variation.available_quantity or 0,
+                    can_write_selling_address=can_write_selling_address
                 )
                 updated_any = updated_any or updated
             # Si el guard de arriba pasó pero ninguna variante con user_product_id
@@ -454,7 +473,8 @@ class Product(object):
             return updated_any
         else:
             return self._update_user_product_stock(
-                meli, self.user_product_id, self.available_quantity or 0
+                meli, self.user_product_id, self.available_quantity or 0,
+                can_write_selling_address=can_write_selling_address
             )
 
     def update_price(self, meli):
