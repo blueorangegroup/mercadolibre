@@ -5,6 +5,11 @@ class InvalidTokenException(Exception):
     pass
 
 
+class SellingAddressBlockedException(Exception):
+    """El sitio no deja escribir el stock por la location selling_address."""
+    pass
+
+
 class RestErrorHandler:
 
     @staticmethod

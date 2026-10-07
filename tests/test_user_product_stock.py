@@ -32,10 +32,12 @@ class FakeResponse(object):
 class FakeMeli(object):
     """Cliente de Mercado Libre mínimo: registra las llamadas y devuelve lo pautado."""
 
-    def __init__(self, locations, x_version='v-1', put_status=204):
+    def __init__(self, locations, x_version='v-1', put_status=204,
+                 selling_address_blocked=False):
         self._locations = locations
         self._x_version = x_version
         self._put_status = put_status
+        self._selling_address_blocked = selling_address_blocked
         self.gets = []
         self.puts = []
 
@@ -48,7 +50,21 @@ class FakeMeli(object):
 
     def put_with_token(self, uri, body=None, extra_headers=None):
         self.puts.append({'uri': uri, 'body': body, 'headers': extra_headers})
+        if self._selling_address_blocked and uri.endswith('/stock/type/selling_address'):
+            return FakeResponse(status_code=400, body=SELLING_ADDRESS_BLOCKED)
+        if uri.startswith('/items/'):
+            return FakeResponse(status_code=200, body={})
         return FakeResponse(status_code=self._put_status, body={})
+
+
+# Respuesta real de MLU (octubre 2026): el sitio no deja escribir selling_address,
+# pero el mismo stock se escribe sin problemas por PUT /items.
+SELLING_ADDRESS_BLOCKED = {
+    'message': 'the site is blocked for modifications to the selling address',
+    'error': 'bad_request',
+    'status': 400,
+    'cause': [],
+}
 
 
 SELLING_ADDRESS = {'type': 'selling_address', 'quantity': 15}
@@ -223,6 +239,42 @@ class TestUserProductStock(unittest.TestCase):
             [put['body'] for put in meli.puts],
             [{'quantity': 4}, {'quantity': 6}],
         )
+
+    # -- Sitio con selling_address bloqueado: se escribe por /items ------------
+
+    def test_a_blocked_selling_address_is_written_through_the_item(self):
+        meli = FakeMeli([SELLING_ADDRESS], selling_address_blocked=True)
+
+        updated = self._product().update_seller_warehouse_stock(meli)
+
+        self.assertTrue(updated)
+        self.assertEqual(meli.puts[-1]['uri'], '/items/MLA3283330096')
+        self.assertEqual(meli.puts[-1]['body'], {'available_quantity': 20})
+
+    def test_a_blocked_selling_address_writes_every_variation_in_one_item_put(self):
+        """
+        PUT /items con variaciones elimina las que no se mandan: van todas, cada una
+        con su cantidad, en un único PUT.
+        """
+        meli = FakeMeli([SELLING_ADDRESS], selling_address_blocked=True)
+
+        updated = self._product_with_variations([4, 6]).update_seller_warehouse_stock(meli)
+
+        self.assertTrue(updated)
+        item_puts = [put for put in meli.puts if put['uri'].startswith('/items/')]
+        self.assertEqual(len(item_puts), 1)
+        self.assertEqual(item_puts[0]['body'], {'variations': [
+            {'id': 'VAR-0', 'available_quantity': 4},
+            {'id': 'VAR-1', 'available_quantity': 6},
+        ]})
+
+    def test_other_selling_address_errors_still_fail(self):
+        """Solo el bloqueo del sitio cae a /items: cualquier otro rechazo sigue fallando."""
+        meli = FakeMeli([SELLING_ADDRESS], put_status=400)
+
+        with self.assertRaises(Exception):
+            self._product().update_seller_warehouse_stock(meli)
+        self.assertFalse(any(put['uri'].startswith('/items/') for put in meli.puts))
 
 
 if __name__ == '__main__':

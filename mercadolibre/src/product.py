@@ -389,6 +389,9 @@ class Product(object):
                 extra_headers=header,
             )
             if response.status_code != 204:
+                if self._is_selling_address_blocked(response):
+                    raise error_handler.SellingAddressBlockedException(
+                        response.json().get('message'))
                 error_handler.RestErrorHandler.handle_error(response)
             return True
 
@@ -455,6 +458,17 @@ class Product(object):
         if self.variations and not any(v.user_product_id for v in self.variations):
             raise Exception("No se informó ID de usuario en ninguna de las variantes del producto")
 
+        # Hay sitios (p. ej. MLU) que bloquean la escritura por selling_address pero
+        # aceptan el mismo stock por PUT /items, que ML impacta en el user-product.
+        # El bloqueo es del sitio, no de la variante: se escribe el item completo,
+        # con todas sus variaciones, en un único PUT.
+        try:
+            return self._update_user_products_stock(meli, can_write_selling_address)
+        except error_handler.SellingAddressBlockedException:
+            self.update_stock(meli)
+            return True
+
+    def _update_user_products_stock(self, meli, can_write_selling_address):
         if self.variations:
             updated_any = False
             for variation in self.variations:
@@ -476,6 +490,11 @@ class Product(object):
                 meli, self.user_product_id, self.available_quantity or 0,
                 can_write_selling_address=can_write_selling_address
             )
+
+    @staticmethod
+    def _is_selling_address_blocked(response):
+        message = (response.json().get('message') or '').lower()
+        return 'blocked for modifications to the selling address' in message
 
     def update_price(self, meli):
         if not self.product_id:
